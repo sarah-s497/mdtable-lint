@@ -1,0 +1,5 @@
+/mdtable-lint
+*.exe
+*.test
+*.out
+.DS_Store
