@@ -53,12 +53,6 @@ Every finding is one line: `file:line: severity: [rule] message`. The
 process exits `1` if any error-level finding was reported, `2` on a usage or
 file I/O problem, `0` otherwise.
 
-## Known limitations
-
-The table scanner doesn't understand fenced code blocks yet, so a
-table-shaped block of text inside a ``` fence will be linted as if it were a
-real table. See the roadmap below.
-
 ## License
 
 MIT, see [LICENSE](LICENSE).

@@ -119,15 +119,64 @@ type table struct {
 	dataRows []row
 }
 
+var fenceStartPattern = regexp.MustCompile("^ {0,3}(`{3,}|~{3,})")
+
+// fencedLineMask returns a slice parallel to lines where fenced[i] is true if
+// line i is the opening/closing fence marker or falls inside a fenced code
+// block. Table detection skips these lines so a table-shaped block of text
+// inside ``` or ~~~ fences isn't misread as a real table.
+func fencedLineMask(lines []string) []bool {
+	fenced := make([]bool, len(lines))
+	var fenceChar byte
+	var fenceLen int
+	inFence := false
+	for i, line := range lines {
+		if inFence {
+			fenced[i] = true
+			if isClosingFence(line, fenceChar, fenceLen) {
+				inFence = false
+			}
+			continue
+		}
+		if m := fenceStartPattern.FindStringSubmatch(line); m != nil {
+			fenced[i] = true
+			fenceChar = m[1][0]
+			fenceLen = len(m[1])
+			inFence = true
+		}
+	}
+	return fenced
+}
+
+// isClosingFence reports whether line closes a fence that was opened with
+// fenceLen or more of fenceChar, per the CommonMark rule: up to 3 leading
+// spaces, a run of the same fence character at least as long as the opener,
+// then nothing but trailing whitespace.
+func isClosingFence(line string, fenceChar byte, fenceLen int) bool {
+	trimmed := strings.TrimLeft(line, " ")
+	if len(line)-len(trimmed) > 3 {
+		return false
+	}
+	count := 0
+	for count < len(trimmed) && trimmed[count] == fenceChar {
+		count++
+	}
+	if count < 3 || count < fenceLen {
+		return false
+	}
+	return strings.TrimSpace(trimmed[count:]) == ""
+}
+
 // findTables scans lines for GFM-style tables: a row containing a pipe,
-// immediately followed by a valid delimiter row. It does not yet understand
-// fenced code blocks, so a table-like block inside ``` fences will be
-// misdetected; see the README roadmap.
+// immediately followed by a valid delimiter row. Lines inside fenced code
+// blocks are skipped so code samples that happen to look like tables aren't
+// linted as real ones.
 func findTables(lines []string) []table {
+	fenced := fencedLineMask(lines)
 	var tables []table
 	i := 0
 	for i < len(lines)-1 {
-		if !looksLikeRow(lines[i]) || !isDelimiterRow(lines[i+1]) {
+		if fenced[i] || fenced[i+1] || !looksLikeRow(lines[i]) || !isDelimiterRow(lines[i+1]) {
 			i++
 			continue
 		}
@@ -140,7 +189,7 @@ func findTables(lines []string) []table {
 		}
 
 		j := i + 2
-		for j < len(lines) && looksLikeRow(lines[j]) {
+		for j < len(lines) && !fenced[j] && looksLikeRow(lines[j]) {
 			cells, lead, trail := splitTableRow(lines[j])
 			t.dataRows = append(t.dataRows, row{line: j + 1, cells: cells, leading: lead, trailing: trail})
 			j++

@@ -220,6 +220,66 @@ func TestLintLinesRules(t *testing.T) {
 	}
 }
 
+func TestIsClosingFence(t *testing.T) {
+	cases := []struct {
+		name      string
+		line      string
+		char      byte
+		minLen    int
+		wantClose bool
+	}{
+		{"exact match", "```", '`', 3, true},
+		{"longer closer", "````", '`', 3, true},
+		{"shorter closer is not enough", "``", '`', 3, false},
+		{"trailing whitespace allowed", "```   ", '`', 3, true},
+		{"trailing text is not a closer", "``` still code", '`', 3, false},
+		{"up to three leading spaces allowed", "   ```", '`', 3, true},
+		{"four leading spaces is not a fence", "    ```", '`', 3, false},
+		{"tilde closer needs tilde", "```", '~', 3, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isClosingFence(c.line, c.char, c.minLen); got != c.wantClose {
+				t.Errorf("isClosingFence(%q, %q, %d) = %v, want %v", c.line, c.char, c.minLen, got, c.wantClose)
+			}
+		})
+	}
+}
+
+func TestLintLinesSkipsFencedCodeBlocks(t *testing.T) {
+	lines := []string{
+		"```",
+		"| Name  | Age |",
+		"|-------|",
+		"| Alice | 30  | Extra |",
+		"```",
+		"",
+		"| Name  | Age |",
+		"|-------|-----|",
+		"| Alice | 30  |",
+	}
+	findings := LintLines("test.md", lines, false)
+	if len(findings) != 0 {
+		t.Errorf("expected no findings for table-shaped text inside a fence, got %v", findings)
+	}
+}
+
+func TestLintLinesRealTableAfterFence(t *testing.T) {
+	lines := []string{
+		"~~~",
+		"| broken | Extra |",
+		"~~~",
+		"| Name  | Age |",
+		"|-------|-----|",
+		"| Alice | 30  |",
+	}
+	findings := LintLines("test.md", lines, false)
+	if len(findings) != 0 {
+		t.Errorf("expected no findings for a clean table after a fence, got %v", findings)
+	}
+}
+
 func TestLintLinesNonTableTextIgnored(t *testing.T) {
 	lines := []string{
 		"This is a paragraph with a | pipe in it but no delimiter row.",
