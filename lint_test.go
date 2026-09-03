@@ -220,6 +220,98 @@ func TestLintLinesRules(t *testing.T) {
 	}
 }
 
+func TestCellAlignment(t *testing.T) {
+	cases := []struct {
+		cell string
+		want alignment
+	}{
+		{"---", alignNone},
+		{":--", alignLeft},
+		{"--:", alignRight},
+		{":--:", alignCenter},
+		{"-", alignNone},
+	}
+	for _, c := range cases {
+		if got := cellAlignment(c.cell); got != c.want {
+			t.Errorf("cellAlignment(%q) = %v, want %v", c.cell, got, c.want)
+		}
+	}
+}
+
+func TestLintLinesAlignmentConsistency(t *testing.T) {
+	cases := []struct {
+		name      string
+		lines     []string
+		wantRules []string
+	}{
+		{
+			name: "same column realigned in a later table is flagged",
+			lines: []string{
+				"| Name  | Age |",
+				"|-------|----:|",
+				"| Alice | 30  |",
+				"",
+				"| Name  | Age |",
+				"|-------|:----|",
+				"| Bob   | 41  |",
+			},
+			wantRules: []string{RuleAlignmentConsistency},
+		},
+		{
+			name: "same column with matching alignment across tables is fine",
+			lines: []string{
+				"| Name  | Age |",
+				"|-------|----:|",
+				"| Alice | 30  |",
+				"",
+				"| Name  | Age |",
+				"|-------|----:|",
+				"| Bob   | 41  |",
+			},
+			wantRules: nil,
+		},
+		{
+			name: "different column names never compared",
+			lines: []string{
+				"| Name  | Age |",
+				"|-------|----:|",
+				"| Alice | 30  |",
+				"",
+				"| Name  | Height |",
+				"|-------|:-------|",
+				"| Bob   | 180    |",
+			},
+			wantRules: nil,
+		},
+		{
+			name: "mismatched delimiter column count is skipped, not compared",
+			lines: []string{
+				"| Name  | Age |",
+				"|-------|----:|",
+				"| Alice | 30  |",
+				"",
+				"| Name  | Age |",
+				"|:----|",
+				"| Bob | 41 |",
+			},
+			wantRules: []string{RuleDelimiterRow},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := LintLines("test.md", c.lines, false)
+			var gotRules []string
+			for _, f := range findings {
+				gotRules = append(gotRules, f.Rule)
+			}
+			if !reflect.DeepEqual(gotRules, c.wantRules) {
+				t.Errorf("rules = %#v, want %#v (findings: %v)", gotRules, c.wantRules, findings)
+			}
+		})
+	}
+}
+
 func TestIsClosingFence(t *testing.T) {
 	cases := []struct {
 		name      string

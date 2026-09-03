@@ -48,10 +48,12 @@ short a cell.
 | `column-count` (too few) | A row has fewer cells than the header | Yes - this is legal GFM |
 | `empty-table` | Header and delimiter row with zero data rows | Yes - a header-only table is valid GFM |
 | `pipe-style` | A row's leading/trailing pipe usage doesn't match the header | Yes - cosmetic only |
+| `alignment-consistency` | A column's declared alignment (from the delimiter row's colons) differs from an earlier table's column with the same header text | No - it's a warning either way |
 
 Every finding is one line: `file:line: severity: [rule] message`. The
 process exits `1` if any error-level finding was reported, `2` on a usage or
-file I/O problem, `0` otherwise.
+file I/O problem, `0` otherwise. `alignment-consistency` findings are
+warnings, so on their own they don't affect the exit code.
 
 ## License
 

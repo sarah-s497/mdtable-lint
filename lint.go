@@ -14,10 +14,11 @@ const (
 )
 
 const (
-	RuleDelimiterRow = "delimiter-row"
-	RuleColumnCount  = "column-count"
-	RuleEmptyTable   = "empty-table"
-	RulePipeStyle    = "pipe-style"
+	RuleDelimiterRow         = "delimiter-row"
+	RuleColumnCount          = "column-count"
+	RuleEmptyTable           = "empty-table"
+	RulePipeStyle            = "pipe-style"
+	RuleAlignmentConsistency = "alignment-consistency"
 )
 
 // Finding is one lint result tied to a specific line in a specific file.
@@ -87,6 +88,33 @@ func endsWithUnescapedPipe(s string) bool {
 		backslashes++
 	}
 	return backslashes%2 == 0
+}
+
+// alignment is the column alignment a delimiter cell declares, per the
+// position of its colons: "---" is none, ":--" is left, "--:" is right, and
+// ":--:" is center.
+type alignment string
+
+const (
+	alignNone   alignment = "none"
+	alignLeft   alignment = "left"
+	alignRight  alignment = "right"
+	alignCenter alignment = "center"
+)
+
+func cellAlignment(cell string) alignment {
+	left := strings.HasPrefix(cell, ":")
+	right := strings.HasSuffix(cell, ":")
+	switch {
+	case left && right:
+		return alignCenter
+	case right:
+		return alignRight
+	case left:
+		return alignLeft
+	default:
+		return alignNone
+	}
 }
 
 func isDelimiterRow(line string) bool {
@@ -252,11 +280,54 @@ func lintTable(filename string, t table, lenient bool) []Finding {
 	return findings
 }
 
+type seenAlignment struct {
+	align alignment
+	line  int
+}
+
+// lintAlignmentConsistency flags a column whose declared alignment changes
+// between tables in the same file. It matches columns by header text (case
+// insensitive), which is how the same "logical" column - e.g. an "Age"
+// column repeated in a table per section of a doc - is expected to line up
+// even though each table's delimiter row is independent per the spec. Only
+// tables where the delimiter row's column count matches the header's are
+// considered, since otherwise there's no reliable way to pair up columns.
+func lintAlignmentConsistency(filename string, tables []table) []Finding {
+	var findings []Finding
+	seen := make(map[string]seenAlignment)
+	for _, t := range tables {
+		if len(t.delim.cells) != len(t.header.cells) {
+			continue
+		}
+		for i, h := range t.header.cells {
+			label := strings.ToLower(strings.TrimSpace(h))
+			if label == "" {
+				continue
+			}
+			align := cellAlignment(t.delim.cells[i])
+			prev, ok := seen[label]
+			if !ok {
+				seen[label] = seenAlignment{align: align, line: t.delim.line}
+				continue
+			}
+			if align != prev.align {
+				findings = append(findings, Finding{
+					File: filename, Line: t.delim.line, Rule: RuleAlignmentConsistency, Severity: SeverityWarning,
+					Message: fmt.Sprintf("column %q is %s-aligned here but %s-aligned at line %d", strings.TrimSpace(h), align, prev.align, prev.line),
+				})
+			}
+		}
+	}
+	return findings
+}
+
 // LintLines runs every rule against every table found in lines.
 func LintLines(filename string, lines []string, lenient bool) []Finding {
+	tables := findTables(lines)
 	var findings []Finding
-	for _, t := range findTables(lines) {
+	for _, t := range tables {
 		findings = append(findings, lintTable(filename, t, lenient)...)
 	}
+	findings = append(findings, lintAlignmentConsistency(filename, tables)...)
 	return findings
 }
