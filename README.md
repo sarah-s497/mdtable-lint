@@ -17,6 +17,14 @@ go build -o mdtable-lint .
 ./mdtable-lint README-example.md
 ```
 
+A `FILE` argument that's actually a directory is rejected unless you pass
+`--recursive`, which walks it and lints every `.md` and `.markdown` file it
+finds:
+
+```
+./mdtable-lint --recursive docs/
+```
+
 Given a file containing:
 
 ```markdown
