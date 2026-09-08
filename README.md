@@ -63,6 +63,30 @@ process exits `1` if any error-level finding was reported, `2` on a usage or
 file I/O problem, `0` otherwise. `alignment-consistency` findings are
 warnings, so on their own they don't affect the exit code.
 
+## JSON output
+
+`--format json` prints one JSON array of finding objects to stdout instead of
+the plain-text lines, for feeding into a CI step instead of a terminal:
+
+```
+./mdtable-lint --format json README-example.md
+```
+
+```json
+[
+  {
+    "file": "README-example.md",
+    "line": 4,
+    "rule": "column-count",
+    "severity": "error",
+    "message": "row has 2 column(s), header has 3"
+  }
+]
+```
+
+Exit codes are the same as text mode. An empty result is `[]`, not no output,
+so a pipeline can always parse stdout as JSON.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

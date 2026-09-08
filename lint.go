@@ -23,11 +23,11 @@ const (
 
 // Finding is one lint result tied to a specific line in a specific file.
 type Finding struct {
-	File     string
-	Line     int
-	Rule     string
-	Severity Severity
-	Message  string
+	File     string   `json:"file"`
+	Line     int      `json:"line"`
+	Rule     string   `json:"rule"`
+	Severity Severity `json:"severity"`
+	Message  string   `json:"message"`
 }
 
 func (f Finding) String() string {
