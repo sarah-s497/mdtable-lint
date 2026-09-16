@@ -63,6 +63,11 @@ process exits `1` if any error-level finding was reported, `2` on a usage or
 file I/O problem, `0` otherwise. `alignment-consistency` findings are
 warnings, so on their own they don't affect the exit code.
 
+Pass `--quiet` to drop warning-level findings from the output entirely - only
+errors get printed (or included in the JSON array). The exit code is
+unaffected either way, since it was never driven by warnings in the first
+place; `--quiet` just cuts the noise in a CI log.
+
 ## JSON output
 
 `--format json` prints one JSON array of finding objects to stdout instead of

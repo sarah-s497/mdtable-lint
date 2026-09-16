@@ -14,8 +14,9 @@ func main() {
 	lenient := flag.Bool("lenient", false, "allow constructs that are technically valid per the GFM table spec but are usually mistakes")
 	recursive := flag.Bool("recursive", false, "if a FILE argument is a directory, walk it recursively for .md and .markdown files")
 	format := flag.String("format", "text", "output format: text or json")
+	quiet := flag.Bool("quiet", false, "suppress warning-level findings, printing only errors")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: mdtable-lint [--lenient] [--recursive] [--format text|json] FILE [FILE...]")
+		fmt.Fprintln(os.Stderr, "usage: mdtable-lint [--lenient] [--recursive] [--quiet] [--format text|json] FILE [FILE...]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -53,6 +54,9 @@ func main() {
 				if f.Severity == SeverityError && exitCode < 1 {
 					exitCode = 1
 				}
+			}
+			if *quiet {
+				findings = filterErrors(findings)
 			}
 			if *format == "text" {
 				for _, f := range findings {
@@ -115,6 +119,19 @@ func resolvePath(path string, recursive bool) ([]string, error) {
 
 func isMarkdownFile(name string) bool {
 	return strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".markdown")
+}
+
+// filterErrors drops warning-level findings, used by --quiet. The exit code
+// is computed from the unfiltered findings before this runs, so --quiet only
+// changes what gets printed, not whether the process reports failure.
+func filterErrors(findings []Finding) []Finding {
+	var out []Finding
+	for _, f := range findings {
+		if f.Severity == SeverityError {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // lintFile reads and lints one file, returning its findings. An I/O error
